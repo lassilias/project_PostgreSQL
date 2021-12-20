@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=2
+ReferrerUrl=http://localhost:8888/tree
+HostUrl=http://localhost:8888/files/results.csv?download=1
