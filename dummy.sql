@@ -1,4 +1,1 @@
-USE INTERNATIONAL_RESULTS;
-SELECT *
-FROM RESULTS
-LIMIT 10;
+select * from results order by pi_db_uid desc limit 10;
