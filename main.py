@@ -12,11 +12,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, select, MetaData, Table, and_, or_
 from datetime import  timedelta
 from typing import Optional
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status,Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel,SecretStr
+import psycopg2
+import json
 
 # creating a FastAPI server
 server = FastAPI(title='International football matches')
@@ -41,6 +43,12 @@ postgres_engine = create_engine(connection_url)
 metadata = MetaData(bind=None)
 table_res = Table('results',metadata,autoload=True,autoload_with=postgres_engine)
 table_sh = Table('shootouts',metadata,autoload=True,autoload_with=postgres_engine)
+
+
+# connection with psycopg2
+
+
+
 
 # creating a Match class
 class Match(BaseModel):
@@ -182,10 +190,37 @@ async def get_status():
     """
     return 1
 
-@server.get('/matches')
-async def get_matches():
+@server.post('/matches')
+async def get_matches(data: str = Form(...)):
 
-    with postgres_engine.connect() as connection:
+    y = json.loads(data)
+    function_name = y['function']
+    del y['function']
+    data = json.dumps(y)
+
+    with psycopg2.connect(
+                    user='postgres',
+                    password='example',
+                    host='dataBase',
+                    port='5432',
+                    dbname='international_results') as connection:
+
+        connection.autocommit = True
+
+        with connection.cursor() as cursor:
+        # list all tables in this database
+            cursor.execute('select table_schema, table_name from information_schema.tables')
+            results = cursor.fetchall()
+            cursor.callproc(function_name, (data,))
+            row = cursor.fetchone()
+            while row is not None:
+                return(row)
+    print(data)
+    print(y['customer'])
+
+    return data
+
+"""     with postgres_engine.connect() as connection:
         results = connection.execute('SELECT * FROM results ORDER BY date DESC LIMIT 10;')
     print(results)
 
@@ -193,7 +228,7 @@ async def get_matches():
         Match(
             date= i[1],
             home_team=i[2],
-            away_team=i[3],
+            away_team=i[3],,
             home_score=i[4],
             away_score=i[5],
             tournament=i[6],
@@ -203,7 +238,7 @@ async def get_matches():
             ) for i in results.fetchall()]
     print(results)
 
-    return results
+    return results """
 
 @server.get('/matches/{team,n}', response_model=List[Match],tags = ['Last n matches'])
 async def get_last_n_matches(team:str,n:int):
