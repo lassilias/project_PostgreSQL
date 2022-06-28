@@ -1,0 +1,1 @@
+select info -> 'customer'  AS items from orders;

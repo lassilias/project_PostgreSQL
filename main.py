@@ -12,11 +12,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, select, MetaData, Table, and_, or_
 from datetime import  timedelta
 from typing import Optional
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status,Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel,SecretStr
+import psycopg2
+import json
 
 # creating a FastAPI server
 server = FastAPI(title='International football matches')
@@ -26,7 +28,6 @@ postgres_url = 'dataBase'  # to complete
 postgres_user = 'postgres'
 postgres_password = 'example'  # to complete
 database_name = 'international_results'
-
 
 # recreating the URL connection
 connection_url = 'postgresql://{user}:{password}@{url}:5432/{database}'.format(
@@ -42,6 +43,12 @@ postgres_engine = create_engine(connection_url)
 metadata = MetaData(bind=None)
 table_res = Table('results',metadata,autoload=True,autoload_with=postgres_engine)
 table_sh = Table('shootouts',metadata,autoload=True,autoload_with=postgres_engine)
+
+
+# connection with psycopg2
+
+
+
 
 # creating a Match class
 class Match(BaseModel):
@@ -89,24 +96,19 @@ with postgres_engine.connect() as connection:
              for i in results.fetchall() }
 
 
-
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-
 class TokenData(BaseModel):
     username: Optional[str] = None
-
 
 class User(BaseModel):
     username: str
     disabled: Optional[bool] = None
 
-
 class UserInDB(User):
     hashed_password: str
-
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -115,16 +117,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-
 def get_password_hash(password):
     return pwd_context.hash(password)
-
 
 def get_user(db, username: str):
     if username in db:
         user_dict = db[username]
         return UserInDB(**user_dict)
-
 
 def authenticate_user(fake_db, username: str, password: str):
     user = get_user(fake_db, username)
@@ -133,7 +132,6 @@ def authenticate_user(fake_db, username: str, password: str):
     if not verify_password(password, user.hashed_password):
         return False
     return user
-
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -144,7 +142,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -165,12 +162,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     return user
 
-
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
-
 
 @server.post("/token",include_in_schema=False, response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -189,7 +184,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 
 
-
 @server.get('/status')
 async def get_status():
     """Returns 1
@@ -197,17 +191,66 @@ async def get_status():
     return 1
 
 
-@server.get('/matches')
-async def get_matches():
+@server.get('/customers')
+async def get_customers():
 
-    with postgres_engine.connect() as connection:
+    with psycopg2.connect(
+                    user='postgres',
+                    password='example',
+                    host='dataBase',
+                    port='5432',
+                    dbname='international_results') as connection:
+
+        connection.autocommit = True
+
+        sql_file = open('get_customers.sql','r')
+
+        with connection.cursor() as cursor:
+        # list all tables in this database
+            cursor.execute(sql_file.read())
+            results = cursor.fetchall()
+            return results
+    
+
+@server.post('/items')
+async def get_items(data: str = Form(...)):
+
+    y = json.loads(data)
+    function_name = y['function']
+    del y['function']
+    data = json.dumps(y)
+
+    with psycopg2.connect(
+                    user='postgres',
+                    password='example',
+                    host='dataBase',
+                    port='5432',
+                    dbname='international_results') as connection:
+
+        connection.autocommit = True
+
+        with connection.cursor() as cursor:
+        # list all tables in this database
+            cursor.execute('select table_schema, table_name from information_schema.tables')
+            results = cursor.fetchall()
+            cursor.callproc(function_name, (data,))
+            row = cursor.fetchone()
+            while row is not None:
+                return(row)
+    print(data)
+    print(y['customer'])
+
+    return data
+
+"""     with postgres_engine.connect() as connection:
         results = connection.execute('SELECT * FROM results ORDER BY date DESC LIMIT 10;')
+    print(results)
 
     results = [
         Match(
             date= i[1],
             home_team=i[2],
-            away_team=i[3],
+            away_team=i[3],,
             home_score=i[4],
             away_score=i[5],
             tournament=i[6],
@@ -215,14 +258,12 @@ async def get_matches():
             country=i[8],
             neutral=i[9],
             ) for i in results.fetchall()]
-    
+    print(results)
 
+    return results """
 
-    return results
-
-
-@server.get('/matches/{team:str,n:int}', response_model=List[Match],tags = ['Last n matches'])
-async def get_last_n_matches(team,n):
+@server.get('/matches/{team,n}', response_model=List[Match],tags = ['Last n matches'])
+async def get_last_n_matches(team:str,n:int):
 
     q= table_res.select().where(or_(table_res.columns.home_team == team, table_res.columns.away_team == team )).order_by(table_res.columns.date.desc()).limit(n)
 
@@ -250,9 +291,8 @@ async def get_last_n_matches(team,n):
 
         return results
 
-
-@server.post('/matches_csv/{team:str, n:int}', response_model=List[Match],tags = ['Last n matches'])
-async def get_last_n_matches_csv(team,n, current_user: User = Depends(get_current_active_user)):
+@server.post('/matches_csv/{team, n}', response_model=List[Match],tags = ['Last n matches'])
+async def get_last_n_matches_csv(team:str,n:int, current_user: User = Depends(get_current_active_user)):
 
     q= table_res.select().where(or_(table_res.columns.home_team == team, table_res.columns.away_team == team )).order_by(table_res.columns.date.desc()).limit(n)
 
@@ -264,7 +304,6 @@ async def get_last_n_matches_csv(team,n, current_user: User = Depends(get_curren
     df.columns = table_res.columns.keys()
 
     stream = io.StringIO()
-
 
     df.to_csv(stream,index=False)
 
@@ -282,9 +321,8 @@ async def get_last_n_matches_csv(team,n, current_user: User = Depends(get_curren
 
         return response
 
-
-@server.post('/insert_match_csv/{date: date.datetime, home_team: str , away_team: str , home_score: int , away_score: int , tournament: str, city: str, country: str, neutral: int  }', response_model=List[Match],tags = ['Insert new match'])
-async def insert_get_new_csv(date, home_team, away_team, home_score , away_score , tournament, city, country, neutral, current_user: User = Depends(get_current_active_user)):
+@server.post('/insert_match_csv/{date, home_team , away_team , home_score , away_score , tournament, city, country, neutral  }', response_model=List[Match],tags = ['Insert new match'])
+async def insert_get_new_csv(date: str, home_team: str, away_team: str, home_score: int , away_score: int , tournament: str, city: str, country: str, neutral: int, current_user: User = Depends(get_current_active_user)):
 
     date = pd.to_datetime(date)
 
@@ -318,9 +356,8 @@ async def insert_get_new_csv(date, home_team, away_team, home_score , away_score
 
         return response
 
-
-@server.get('/matches_shootouts/{team:str,n:int}', response_model=List[Match_shootout], tags = ['Last n matches with shootouts'])
-async def get_matches(team,n):
+@server.get('/matches_shootouts/{team,n}', response_model=List[Match_shootout], tags = ['Last n matches with shootouts'])
+async def get_matches(team:str,n:int):
 
     with postgres_engine.connect() as connection:
         results = connection.execute(
@@ -332,7 +369,7 @@ async def get_matches(team,n):
         ORDER BY r.date DESC
         LIMIT {b};'''.format(a=team,b=n))
 
-    results = [
+    results= [
         Match_shootout(
             date= i[1],
             home_team=i[2],
@@ -351,12 +388,10 @@ async def get_matches(team,n):
             status_code=404,
             detail='Unknown team')
     else:
-
         return results
 
-
-@server.get('/matches_year/{team:str, year_date: int }', response_model=List[Match], tags = ['Get matches year'])
-async def get_matches_year(team,year_date):
+@server.get('/matches_year/{team, year_date}', response_model=List[Match], tags = ['Get matches year'])
+async def get_matches_year(team:str,year_date:int):
 
     with postgres_engine.connect() as connection:
         results = connection.execute(
@@ -388,13 +423,15 @@ async def get_matches_year(team,year_date):
 
 
 
-
 if __name__ == "__main__":
     uvicorn.run(server, host="0.0.0.0", port=8000)
-
 
 
 #from passlib.context import CryptContext
 
 #pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 #pwd_context.hash("")
+
+
+
+
