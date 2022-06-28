@@ -1,7 +1,7 @@
 #!/bin/bash
 #wget -O results.csv https://raw.githubusercontent.com/martj42/international_results/master/results.csv
 #wget -O shootouts.csv https://raw.githubusercontent.com/martj42/international_results/master/shootouts.csv
-make build
+docker build --rm -t my_image:latest .
 #docker volume create shared_volume
 docker-compose up -d
 until [ "`docker inspect -f {{.State.Running}} project_postgresql_dataBase_1`" == "true" ]; do
@@ -24,4 +24,3 @@ docker exec -it test_container_test  bash -c "airflow tasks test etl_LASSOULI te
 # airflow trigger_dag
 docker exec -i project_postgresql_dataBase_1 psql international_results postgres < dummy.sql
 docker exec -it  test_container_test  bash -c "python3 main.py"
-

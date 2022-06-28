@@ -190,6 +190,7 @@ async def get_status():
     """
     return 1
 
+<<<<<<< HEAD
 
 @server.get('/customers')
 async def get_customers():
@@ -214,6 +215,10 @@ async def get_customers():
 
 @server.post('/items')
 async def get_items(data: str = Form(...)):
+=======
+@server.post('/matches')
+async def get_matches(data: str = Form(...)):
+>>>>>>> 7ed4921fd9a7cb50e1f2879e203ab8947f292ad1
 
     y = json.loads(data)
     function_name = y['function']
@@ -259,9 +264,15 @@ async def get_items(data: str = Form(...)):
             neutral=i[9],
             ) for i in results.fetchall()]
     print(results)
+<<<<<<< HEAD
 
     return results """
 
+=======
+
+    return results """
+
+>>>>>>> 7ed4921fd9a7cb50e1f2879e203ab8947f292ad1
 @server.get('/matches/{team,n}', response_model=List[Match],tags = ['Last n matches'])
 async def get_last_n_matches(team:str,n:int):
 

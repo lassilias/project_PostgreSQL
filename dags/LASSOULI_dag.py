@@ -9,11 +9,9 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.python import get_current_context
 from airflow.utils.dates import days_ago
 
-
 # Les arguments qui suivent vont être attribués à chaque Operators.
 # Il est bien évidemment possible de changer les arguments spécifiquement pour un Operators.
 # Vous pouvez vous renseigner sur la Doc d'Airflow des différents paramètres que l'on peut définir.
-
 
 
 default_args = {
@@ -72,7 +70,6 @@ def extract_and_transform(ti):
 
     df2.to_csv('/home/airflow/shootouts.csv',index=False)
 
-
 t1 = PythonOperator(
     task_id='extract_and_transform',
     python_callable=extract_and_transform,
@@ -87,7 +84,6 @@ t2 = PostgresOperator(
     sql=r""" SELECT 1; """,
     dag=dag
 )
-
 
 #################################################### transfer local files to server location ########################################################################
 def dtype_mapping():
@@ -127,9 +123,13 @@ def mapping_pandas_sql(**kwargs):
     # tbl_cols_sql2.replace(',',',\n')
     #kwargs['ti'].xcom_push(key='nom_col_sql', value=tbl_cols_sql.replace(',',',\n'))
     #kwargs['ti'].xcom_push(key='nom_col_sql2', value=tbl_cols_sql2.replace(',',',\n'))
+<<<<<<< HEAD
 
     return tbl_cols_sql2.replace(',',',\n')
+=======
+>>>>>>> 7ed4921fd9a7cb50e1f2879e203ab8947f292ad1
 
+    return tbl_cols_sql2.replace(',',',\n')
 
 t3 = PythonOperator(
     task_id='mapping_pandas_sql',provide_context=True,
@@ -175,7 +175,6 @@ t5 = PostgresOperator(
     dag=dag
 )
 
-
 t6 = PostgresOperator(
     task_id='create_table_mysql_external_file3',
     sql=r"""
@@ -187,15 +186,21 @@ t6 = PostgresOperator(
     dag=dag
 )
 
-
 #################################################test#######################################
 def testt(**kwargs):
 
+<<<<<<< HEAD
+#################################################test#######################################
+def testt(**kwargs):
+
+=======
+>>>>>>> 7ed4921fd9a7cb50e1f2879e203ab8947f292ad1
     ti = kwargs['ti']
     a = ti.xcom_pull(task_ids='mapping_pandas_sql') 
     #b = kwargs['ti'].xcom_pull(key='nom_col_sql2',task_ids='mapping_pandas_sql') 
     print(a)
     #print(b)
+<<<<<<< HEAD
 
 t7 = PythonOperator(
     task_id='testt',provide_context=True,
@@ -208,5 +213,13 @@ t1 >> t2 >> t3 >> t4 >> t5 >> t6 >> t7
 
 
 
+=======
+>>>>>>> 7ed4921fd9a7cb50e1f2879e203ab8947f292ad1
 
+t7 = PythonOperator(
+    task_id='testt',provide_context=True,
+    python_callable=testt,
+    dag=dag
+)
 
+t1 >> t2 >> t3 >> t4 >> t5 >> t6 >> t7
